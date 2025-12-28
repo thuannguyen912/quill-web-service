@@ -6,21 +6,33 @@ const { BlobServiceClient } = require('@azure/storage-blob');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// Configuration
 const STORAGE_ACCOUNT = 'storageaccnt1228545';
 const CONTAINER_NAME = 'mapty';
 
-// Serve static files (HTML, CSS, JS)
 app.use(express.static('public'));
 
-// API endpoint to serve images from Blob Storage using Managed Identity
+// Helper function to get MIME type from file extension
+function getContentType(filename) {
+    const ext = path.extname(filename).toLowerCase();
+    const mimeTypes = {
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.svg': 'image/svg+xml',
+        '.webp': 'image/webp',
+        '.ico': 'image/x-icon',
+        '.bmp': 'image/bmp'
+    };
+    return mimeTypes[ext] || 'application/octet-stream';
+}
+
 app.get('/api/image/:imageName', async (req, res) => {
     const { imageName } = req.params;
     
     try {
         console.log(`[INFO] Fetching image: ${imageName}`);
         
-        // Use Managed Identity (no secrets needed!)
         const credential = new DefaultAzureCredential();
         const blobServiceClient = new BlobServiceClient(
             `https://${STORAGE_ACCOUNT}.blob.core.windows.net`,
@@ -33,18 +45,20 @@ app.get('/api/image/:imageName', async (req, res) => {
         console.log('[INFO] Downloading blob...');
         const downloadResponse = await blobClient.download();
         
-        // Set headers
-        res.set('Content-Type', downloadResponse.contentSettings?.contentType || 'image/svg+xml');
+        // Use blob metadata first, fallback to file extension
+        const contentType = downloadResponse.contentSettings?.contentType || getContentType(imageName);
+        
+        console.log(`[INFO] Content-Type: ${contentType}`);
+        
+        res.set('Content-Type', contentType);
         res.set('Cache-Control', 'public, max-age=3600');
         
-        // Stream blob to response
         downloadResponse.readableStreamBody.pipe(res);
         
         console.log('[SUCCESS] Blob streamed successfully');
         
     } catch (error) {
         console.error(`[ERROR] ${error.message}`);
-        console.error(`[ERROR] Code: ${error.code}`);
         res.status(error.statusCode || 500).json({
             error: error.message,
             code: error.code
@@ -52,7 +66,6 @@ app.get('/api/image/:imageName', async (req, res) => {
     }
 });
 
-// Health check endpoint
 app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'OK', 
@@ -62,8 +75,6 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// Start server
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-    console.log(`Managed Identity enabled for ${STORAGE_ACCOUNT}`);
 });
