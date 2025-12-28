@@ -8,7 +8,7 @@ const PORT = process.env.PORT || 8080;
 
 // Configuration
 const STORAGE_ACCOUNT = 'storageaccnt1228545';
-const CONTAINER_NAME = 'quill-imgs';
+const CONTAINER_NAME = 'mapty';
 
 // Serve static files (HTML, CSS, JS)
 app.use(express.static('public'));
